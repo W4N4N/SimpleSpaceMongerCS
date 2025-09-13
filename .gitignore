@@ -1,0 +1,64 @@
+# Build artifacts
+bin/
+obj/
+
+# Visual Studio files
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Rider
+.idea/
+
+# Visual Studio Code workspace
+.vscode/
+
+# NuGet
+*.nupkg
+packages/
+
+# Test results
+TestResults/
+
+# Logs
+*.log
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
+
+# Rider cache
+*.dotCover
+
+# JetBrains Rider
+.idea/
+
+# User-specific files
+*.suo
+*.user
+*.userprefs
+
+# Publish output
+publish/
+
+# Dotnet tool
+.project.lock.json
+
+# Rider metadata
+*.sln.iml
+
+# Resharper
+_ReSharper*/
+*.DotSettings.user
+
+# Coverage
+coverage*/
+
+# Local history
+.localhistory/
