@@ -26,6 +26,7 @@ namespace SimpleSpaceMongerCS
         private System.Windows.Forms.Timer hoverTimer;
         private string? pendingHoverPath = null;
         private Point pendingHoverPoint;
+        private Point lastMousePos;
 
         public MainForm()
         {
@@ -290,6 +291,31 @@ namespace SimpleSpaceMongerCS
             }
 
             DrawTreemap(g2, rect, items, 0);
+
+            // Draw a subtle highlight around the parent tile (second-innermost) under the mouse to aid clicking
+            try
+            {
+                if (!lastMousePos.IsEmpty && tileHitTest.Count > 0)
+                {
+                    var matches = tileHitTest.Where(t => t.rect.Contains(lastMousePos.X, lastMousePos.Y)).ToList();
+                    if (matches.Count >= 2)
+                    {
+                        var parent = matches[matches.Count - 2];
+                        var parentRect = parent.rect;
+                        using (var brush = new SolidBrush(Color.FromArgb(40, 0, 120, 215)))
+                        {
+                            g2.FillRectangle(brush, parentRect);
+                        }
+                        using (var pen = new Pen(Color.FromArgb(200, 0, 120, 215), 3))
+                        {
+                            g2.DrawRectangle(pen, Rectangle.Round(parentRect));
+                        }
+                     }
+                 }
+             }
+            catch { }
+
+            return;
         }
 
         // Improved treemap using recursive binary partitioning for better aspect ratios
@@ -316,8 +342,12 @@ namespace SimpleSpaceMongerCS
                 if (children.Count > 0)
                 {
                     Rectangle inner = Rectangle.Round(rf);
-                    inner.Inflate(-4, -4);
-                    DrawTreemap(g, inner, children, depth + 1);
+                    // Increase padding with depth so nested tiles don't tightly overlap parent borders
+                    // Reduced values to make padding less aggressive
+                    int pad = 6;
+                    inner.Inflate(-pad, -pad);
+                    if (inner.Width > 0 && inner.Height > 0)
+                        DrawTreemap(g, inner, children, depth + 1);
                 }
                 return;
             }
@@ -364,7 +394,14 @@ namespace SimpleSpaceMongerCS
             bool isDrive = it.path != null && it.path.StartsWith("DRIVE:");
             var col = isFree ? Color.White : GraphicsHelpers.ColorFromString(it.path ?? string.Empty, depth);
             using (var brush = new SolidBrush(col)) g.FillRectangle(brush, r);
-            using (var pen = new Pen(Color.FromArgb(120, 0, 0, 0))) g.DrawRectangle(pen, Rectangle.Round(r));
+
+            int penWidth = Math.Min(4, 1 + depth / 2); // modest thickening for deeper tiles
+            using (var pen = new Pen(Color.FromArgb(110, 100, 100, 100), penWidth))
+             {
+                 // draw outer rectangle with rounded stroke thickness
+                 var rr = Rectangle.Round(r);
+                 g.DrawRectangle(pen, rr);
+             }
 
             // Draw a small drive icon for drive tiles
             if (isDrive)
@@ -401,6 +438,7 @@ namespace SimpleSpaceMongerCS
         private void DrawPanel_MouseMove(object? sender, MouseEventArgs e)
         {
             var p = e.Location;
+            lastMousePos = p;
             var found = tileHitTest.LastOrDefault(t => t.rect.Contains(p.X, p.Y));
             if (found.path != null)
             {
