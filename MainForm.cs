@@ -282,7 +282,29 @@ namespace SimpleSpaceMongerCS
             // If total reported size for the root is larger than the sum of immediate children,
             // treat the remainder as "free space" and show it as a white tile.
             long sumChildren = items.Sum(i => i.size);
-            long freeSpace = Math.Max(0L, total - sumChildren);
+            long freeSpace = 0;
+            try
+            {
+                // If rootPath is a drive root (e.g. "D:\\"), compute free space from the drive itself
+                var root = Path.GetPathRoot(rootPath ?? string.Empty) ?? string.Empty;
+                if (!string.IsNullOrEmpty(root) && string.Equals(root.TrimEnd(Path.DirectorySeparatorChar), rootPath?.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        var di = new DriveInfo(root);
+                        if (di.IsReady) freeSpace = Math.Max(0L, di.AvailableFreeSpace);
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+
+            // Fallback: if we did not get a drive free-space value, compute remaining space under the current root (files directly in root)
+            if (freeSpace == 0)
+            {
+                freeSpace = Math.Max(0L, total - sumChildren);
+            }
+
             if (freeSpace > 0)
             {
                 // Use a synthetic path marker to identify the free-space tile
@@ -392,16 +414,27 @@ namespace SimpleSpaceMongerCS
         {
             bool isFree = it.path != null && it.path.EndsWith("|FREE|");
             bool isDrive = it.path != null && it.path.StartsWith("DRIVE:");
-            var col = isFree ? Color.White : GraphicsHelpers.ColorFromString(it.path ?? string.Empty, depth);
-            using (var brush = new SolidBrush(col)) g.FillRectangle(brush, r);
 
+            if (isFree)
+            {
+                // Render free space as a clean white block (no label), proportional in area
+                using (var brush = new SolidBrush(Color.White)) g.FillRectangle(brush, r);
+                using (var pen = new Pen(Color.FromArgb(80, 200, 200, 200), 1))
+                {
+                    g.DrawRectangle(pen, Rectangle.Round(r));
+                }
+                tileHitTest.Add((r, it.path, it.size, it.name));
+                return;
+            }
+
+            var col = GraphicsHelpers.ColorFromString(it.path ?? string.Empty, depth);
+            using (var brush = new SolidBrush(col)) g.FillRectangle(brush, r);
             int penWidth = Math.Min(4, 1 + depth / 2); // modest thickening for deeper tiles
             using (var pen = new Pen(Color.FromArgb(110, 100, 100, 100), penWidth))
-             {
-                 // draw outer rectangle with rounded stroke thickness
-                 var rr = Rectangle.Round(r);
-                 g.DrawRectangle(pen, rr);
-             }
+            {
+                var rr = Rectangle.Round(r);
+                g.DrawRectangle(pen, rr);
+            }
 
             // Draw a small drive icon for drive tiles
             if (isDrive)
@@ -409,7 +442,6 @@ namespace SimpleSpaceMongerCS
                 try
                 {
                     Icon icon = SystemIcons.Application; // fallback icon
-                    // draw icon in top-left corner of the tile
                     var iconRect = new Rectangle((int)r.X + 4, (int)r.Y + 4, 16, 16);
                     g.DrawIcon(icon, iconRect);
                 }
