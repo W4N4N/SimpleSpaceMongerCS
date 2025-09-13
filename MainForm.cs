@@ -11,7 +11,7 @@ namespace SimpleSpaceMongerCS
 {
     public class MainForm : Form
     {
-        private Button btnBrowse;
+        private MenuStrip menuStrip;
         private Panel drawPanel;
         private FolderBrowserDialog folderDialog;
         private ProgressBar progressBar;
@@ -19,8 +19,9 @@ namespace SimpleSpaceMongerCS
         private Dictionary<string, long> sizes = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         private string rootPath;
         private long total;
-        private List<(RectangleF rect, string path, long size, string name)> tileHitTest = new List<(RectangleF, string, long, string)>();
+        private List<(RectangleF rect, string? path, long size, string name)> tileHitTest = new List<(RectangleF, string?, long, string)>();
         private ToolTip hoverTip = new ToolTip();
+        private Image? diskIcon;
         private string? lastHoverPath = null;
         private System.Windows.Forms.Timer hoverTimer;
         private string? pendingHoverPath = null;
@@ -32,9 +33,10 @@ namespace SimpleSpaceMongerCS
             Width = 1000;
             Height = 700;
 
-            btnBrowse = new Button { Text = "Browse...", Dock = DockStyle.Top, Height = 30 };
-            btnBrowse.Click += BtnBrowse_Click;
+            //btnBrowse = new Button { Text = "Browse...", Dock = DockStyle.Top, Height = 30 };
+            //btnBrowse.Click += BtnBrowse_Click;
 
+            //progressBar = new ProgressBar { Dock = DockStyle.Top, Height = 20, Minimum = 0, Maximum = 100, Value = 0 };
             progressBar = new ProgressBar { Dock = DockStyle.Top, Height = 20, Minimum = 0, Maximum = 100, Value = 0 };
             lblStatus = new Label { Text = "Ready", Dock = DockStyle.Top, Height = 18, TextAlign = ContentAlignment.MiddleLeft };
 
@@ -51,13 +53,52 @@ namespace SimpleSpaceMongerCS
             Controls.Add(drawPanel);
             Controls.Add(lblStatus);
             Controls.Add(progressBar);
-            Controls.Add(btnBrowse);
 
+            // Initialize folder dialog and root path before building menu so menu handlers can reference rootPath
             folderDialog = new FolderBrowserDialog();
-            rootPath = Directory.GetCurrentDirectory();
+            // Start in drives overview mode so user can pick a disk quickly
+            rootPath = "__DRIVES__";
+
+            // Try to load a disk icon image from the application folder (disk.webp)
+            try
+            {
+                var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "disk.webp");
+                if (File.Exists(iconPath)) diskIcon = Image.FromFile(iconPath);
+            }
+            catch { diskIcon = null; }
+
+            // Create menu strip to replace the old Browse button
+            menuStrip = new MenuStrip();
+            var fileMenu = new ToolStripMenuItem("File");
+            var browseItem = new ToolStripMenuItem("Browse...", null, BtnBrowse_Click);
+            var refreshItem = new ToolStripMenuItem("Refresh", null, (s, a) => { if (rootPath == "__DRIVES__") drawPanel.Invalidate(); else _ = ScanAndInvalidateAsync(rootPath); });
+            var exitItem = new ToolStripMenuItem("Exit", null, (s, a) => { this.Close(); });
+            fileMenu.DropDownItems.Add(browseItem);
+            fileMenu.DropDownItems.Add(refreshItem);
+            fileMenu.DropDownItems.Add(new ToolStripSeparator());
+            fileMenu.DropDownItems.Add(exitItem);
+
+            var viewMenu = new ToolStripMenuItem("View");
+            var zoomInMenu = new ToolStripMenuItem("Zoom In", null, (s, a) => ZoomInMenu_Click(s, a));
+            var zoomOutMenu = new ToolStripMenuItem("Zoom Out", null, (s, a) => ZoomOutMenu_Click(s, a));
+            viewMenu.DropDownItems.Add(zoomInMenu);
+            viewMenu.DropDownItems.Add(zoomOutMenu);
+
+            var helpMenu = new ToolStripMenuItem("Help");
+            helpMenu.DropDownItems.Add(new ToolStripMenuItem("About", null, (s, a) => AboutMenu_Click(s, a)));
+
+            menuStrip.Items.Add(fileMenu);
+            menuStrip.Items.Add(viewMenu);
+            menuStrip.Items.Add(helpMenu);
+
+            // Add menuStrip last so it docks to the top above other top-docked controls
+            Controls.Add(menuStrip);
 
             // Initial async scan
-            _ = ScanAndInvalidateAsync(rootPath);
+            if (rootPath == "__DRIVES__")
+                drawPanel.Invalidate();
+            else
+                _ = ScanAndInvalidateAsync(rootPath);
         }
 
         private void BtnBrowse_Click(object? sender, EventArgs e)
@@ -67,6 +108,45 @@ namespace SimpleSpaceMongerCS
                 rootPath = folderDialog.SelectedPath;
                 _ = ScanAndInvalidateAsync(rootPath);
             }
+        }
+
+        private void ZoomInMenu_Click(object? sender, EventArgs e)
+        {
+            if (!string.IsNullOrEmpty(lastHoverPath) && !lastHoverPath.EndsWith("|FREE|"))
+            {
+                if (Directory.Exists(lastHoverPath))
+                {
+                    rootPath = lastHoverPath;
+                    _ = ScanAndInvalidateAsync(rootPath);
+                }
+                else
+                {
+                    MessageBox.Show("Selected item is not a folder to zoom into.", "Zoom In", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+            else
+            {
+                MessageBox.Show("No folder selected to zoom in. Hover or click a folder first.", "Zoom In", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void ZoomOutMenu_Click(object? sender, EventArgs e)
+        {
+            var parent = Path.GetDirectoryName(rootPath);
+            if (!string.IsNullOrEmpty(parent))
+            {
+                rootPath = parent;
+                _ = ScanAndInvalidateAsync(rootPath);
+            }
+            else
+            {
+                MessageBox.Show("No parent folder to zoom out to.", "Zoom Out", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void AboutMenu_Click(object? sender, EventArgs e)
+        {
+            MessageBox.Show("Simple SpaceMonger - simple disk treemap viewer", "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private async Task ScanAndInvalidateAsync(string path)
@@ -101,12 +181,77 @@ namespace SimpleSpaceMongerCS
 
         private void DrawPanel_Paint(object? sender, PaintEventArgs e)
         {
-            var g = e.Graphics;
-            g.Clear(Color.White);
+            // If we're in drives overview mode, show each logical drive as a grid of icons (like Explorer)
+            if (rootPath == "__DRIVES__")
+            {
+                var g = e.Graphics;
+                g.Clear(Color.White);
+                tileHitTest.Clear();
+
+                var drives = DriveInfo.GetDrives().Where(d => d.IsReady)
+                    .OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
+                    .Select(d =>
+                {
+                    long size = d.TotalSize > 0 ? d.TotalSize : 1;
+                    string letter = d.Name.TrimEnd('\\'); // e.g. "C:"
+                    string label = string.IsNullOrEmpty(d.VolumeLabel) ? letter : $"{letter}: {d.VolumeLabel}";
+                    return (drive: d, path: "DRIVE:" + d.Name, size: size, name: label);
+                }).ToList();
+
+                if (drives.Count == 0)
+                {
+                    g.DrawString("No drives found", Font, Brushes.Black, 10, 10);
+                    return;
+                }
+
+                int padding = 12;
+                int iconSize = 64;
+                int labelHeight = 20;
+                int cellWidth = iconSize + padding * 2;
+                int clientWidth = drawPanel.ClientSize.Width;
+                int cols = Math.Max(1, clientWidth / cellWidth);
+                int x0 = padding;
+                int y0 = padding;
+
+                for (int i = 0; i < drives.Count; i++)
+                {
+                    int col = i % cols;
+                    int row = i / cols;
+                    int x = x0 + col * cellWidth;
+                    int y = y0 + row * (iconSize + labelHeight + padding);
+
+                    var iconRect = new RectangleF(x, y, iconSize, iconSize);
+
+                    // Draw icon
+                    if (diskIcon != null)
+                    {
+                        g.DrawImage(diskIcon, Rectangle.Round(iconRect));
+                    }
+                    else
+                    {
+                        try { g.DrawIcon(SystemIcons.Application, Rectangle.Round(iconRect)); } catch { }
+                    }
+
+                    // Draw label centered under icon
+                    var label = drives[i].name;
+                    var labelRect = new RectangleF(x, y + iconSize, iconSize, labelHeight);
+                    var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Near };
+                    g.DrawString(label, this.Font, Brushes.Black, labelRect, sf);
+
+                    // Hit-test area (icon + label)
+                    var hitRect = new RectangleF(x - padding/2, y - padding/2, iconSize + padding, iconSize + labelHeight + padding);
+                    tileHitTest.Add((hitRect, drives[i].path, drives[i].size, drives[i].name));
+                }
+
+                return;
+            }
+
+            var g2 = e.Graphics;
+            g2.Clear(Color.White);
             tileHitTest.Clear();
             if (sizes == null || sizes.Count == 0)
             {
-                g.DrawString(lblStatus.Text, Font, Brushes.Black, 10, 10);
+                g2.DrawString(lblStatus.Text, Font, Brushes.Black, 10, 10);
                 return;
             }
 
@@ -127,12 +272,24 @@ namespace SimpleSpaceMongerCS
 
             if (rootChildren.Count == 0)
             {
-                g.DrawString("No subfolders", Font, Brushes.Black, 10, 10);
+                g2.DrawString("No subfolders", Font, Brushes.Black, 10, 10);
                 return;
             }
 
             var items = rootChildren.OrderByDescending(i => i.size).ToList();
-            DrawTreemap(g, rect, items, 0);
+
+            // If total reported size for the root is larger than the sum of immediate children,
+            // treat the remainder as "free space" and show it as a white tile.
+            long sumChildren = items.Sum(i => i.size);
+            long freeSpace = Math.Max(0L, total - sumChildren);
+            if (freeSpace > 0)
+            {
+                // Use a synthetic path marker to identify the free-space tile
+                items.Add((path: rootPath + "|FREE|", size: freeSpace, name: "Free space"));
+                items = items.OrderByDescending(i => i.size).ToList();
+            }
+
+            DrawTreemap(g2, rect, items, 0);
         }
 
         // Improved treemap using recursive binary partitioning for better aspect ratios
@@ -201,11 +358,26 @@ namespace SimpleSpaceMongerCS
             }
         }
 
-        private void DrawTile(Graphics g, RectangleF r, (string path, long size, string name) it, int depth)
+        private void DrawTile(Graphics g, RectangleF r, (string? path, long size, string name) it, int depth)
         {
-            var col = GraphicsHelpers.ColorFromString(it.path, depth);
+            bool isFree = it.path != null && it.path.EndsWith("|FREE|");
+            bool isDrive = it.path != null && it.path.StartsWith("DRIVE:");
+            var col = isFree ? Color.White : GraphicsHelpers.ColorFromString(it.path ?? string.Empty, depth);
             using (var brush = new SolidBrush(col)) g.FillRectangle(brush, r);
             using (var pen = new Pen(Color.FromArgb(120, 0, 0, 0))) g.DrawRectangle(pen, Rectangle.Round(r));
+
+            // Draw a small drive icon for drive tiles
+            if (isDrive)
+            {
+                try
+                {
+                    Icon icon = SystemIcons.Application; // fallback icon
+                    // draw icon in top-left corner of the tile
+                    var iconRect = new Rectangle((int)r.X + 4, (int)r.Y + 4, 16, 16);
+                    g.DrawIcon(icon, iconRect);
+                }
+                catch { }
+            }
 
             string label = it.name;
             string info = GraphicsHelpers.HumanReadable(it.size);
@@ -260,11 +432,29 @@ namespace SimpleSpaceMongerCS
             var tile = tileHitTest.LastOrDefault(t => t.rect.Contains(p.X, p.Y));
             if (tile.path == null) return;
 
+            bool isDrive = tile.path.StartsWith("DRIVE:");
             if (e.Button == MouseButtons.Left)
             {
-                // Left click: behave like hover (show tooltip/details briefly)
+                // If this is a drive tile, start scanning it on left-click
+                if (isDrive)
+                {
+                    string actualPath = tile.path.Substring("DRIVE:".Length);
+                    rootPath = actualPath;
+                    _ = ScanAndInvalidateAsync(rootPath);
+                    return;
+                }
+
+                // Otherwise behave like hover (show tooltip/details briefly)
                 lastHoverPath = tile.path;
-                hoverTip.Show($"{tile.name}\n{GraphicsHelpers.HumanReadable(tile.size)}\n{tile.path}", drawPanel, p.X + 15, p.Y + 15, 5000);
+                bool isFree = tile.path.EndsWith("|FREE|");
+                if (isFree)
+                {
+                    hoverTip.Show($"{tile.name}\n{GraphicsHelpers.HumanReadable(tile.size)}", drawPanel, p.X + 15, p.Y + 15, 5000);
+                }
+                else
+                {
+                    hoverTip.Show($"{tile.name}\n{GraphicsHelpers.HumanReadable(tile.size)}\n{tile.path}", drawPanel, p.X + 15, p.Y + 15, 5000);
+                }
             }
             else if (e.Button == MouseButtons.Right)
             {
@@ -272,40 +462,79 @@ namespace SimpleSpaceMongerCS
                 string clickedPath = tile.path;
                 long clickedSize = tile.size;
                 string clickedName = tile.name;
+                bool isFree = clickedPath.EndsWith("|FREE|");
+                // reuse outer isDrive variable
 
                 var cms = new ContextMenuStrip();
-                cms.Items.Add("Open in Explorer", null, (s, a) =>
-                {
-                    try
-                    {
-                        if (Directory.Exists(clickedPath)) Process.Start("explorer.exe", clickedPath);
-                        else if (File.Exists(clickedPath)) Process.Start("explorer.exe", "/select,\"" + clickedPath + "\"");
-                        else MessageBox.Show("Path not found.", "Open", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    }
-                    catch (Exception ex) { MessageBox.Show("Failed to open: " + ex.Message); }
-                });
 
-                cms.Items.Add("Details", null, (s, a) =>
+                if (isDrive)
                 {
-                    MessageBox.Show($"{clickedName}\n{GraphicsHelpers.HumanReadable(clickedSize)}\n{clickedPath}", "Details", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                });
-
-                cms.Items.Add("Zoom In", null, (s, a) =>
-                {
-                    try
+                    // For drives, allow open and details and zoom in (scan this drive)
+                    string actualPath = clickedPath.Substring("DRIVE:".Length);
+                    cms.Items.Add("Open in Explorer", null, (s, a) =>
                     {
-                        if (Directory.Exists(clickedPath))
+                        try
                         {
-                            rootPath = clickedPath;
-                            _ = ScanAndInvalidateAsync(rootPath);
+                            if (Directory.Exists(actualPath)) Process.Start("explorer.exe", actualPath);
+                            else MessageBox.Show("Path not found.", "Open", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         }
-                        else if (File.Exists(clickedPath))
+                        catch (Exception ex) { MessageBox.Show("Failed to open: " + ex.Message); }
+                    });
+
+                    cms.Items.Add("Details", null, (s, a) =>
+                    {
+                        MessageBox.Show($"{clickedName}\n{GraphicsHelpers.HumanReadable(clickedSize)}\n{actualPath}", "Details", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    });
+
+                    cms.Items.Add("Scan this disk", null, (s, a) =>
+                    {
+                        rootPath = actualPath;
+                        _ = ScanAndInvalidateAsync(rootPath);
+                    });
+                }
+                else if (!isFree)
+                {
+                    cms.Items.Add("Open in Explorer", null, (s, a) =>
+                    {
+                        try
                         {
-                            MessageBox.Show("Cannot zoom into a file. Select its containing folder.", "Zoom In", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            if (Directory.Exists(clickedPath)) Process.Start("explorer.exe", clickedPath);
+                            else if (File.Exists(clickedPath)) Process.Start("explorer.exe", "/select,\"" + clickedPath + "\"");
+                            else MessageBox.Show("Path not found.", "Open", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         }
-                    }
-                    catch (Exception ex) { MessageBox.Show("Zoom failed: " + ex.Message); }
-                });
+                        catch (Exception ex) { MessageBox.Show("Failed to open: " + ex.Message); }
+                    });
+
+                    cms.Items.Add("Details", null, (s, a) =>
+                    {
+                        MessageBox.Show($"{clickedName}\n{GraphicsHelpers.HumanReadable(clickedSize)}\n{clickedPath}", "Details", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    });
+
+                    cms.Items.Add("Zoom In", null, (s, a) =>
+                    {
+                        try
+                        {
+                            if (Directory.Exists(clickedPath))
+                            {
+                                rootPath = clickedPath;
+                                _ = ScanAndInvalidateAsync(rootPath);
+                            }
+                            else if (File.Exists(clickedPath))
+                            {
+                                MessageBox.Show("Cannot zoom into a file. Select its containing folder.", "Zoom In", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            }
+                        }
+                        catch (Exception ex) { MessageBox.Show("Zoom failed: " + ex.Message); }
+                    });
+                }
+                else
+                {
+                    // For free-space tile only show Details
+                    cms.Items.Add("Details", null, (s, a) =>
+                    {
+                        MessageBox.Show($"{clickedName}\n{GraphicsHelpers.HumanReadable(clickedSize)}", "Details", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    });
+                }
 
                 cms.Items.Add("Zoom Out", null, (s, a) =>
                 {
@@ -338,7 +567,9 @@ namespace SimpleSpaceMongerCS
                 if (tile.path != null)
                 {
                     lastHoverPath = tile.path;
-                    hoverTip.Show($"{tile.name}\n{GraphicsHelpers.HumanReadable(tile.size)}\n{tile.path}", drawPanel, pendingHoverPoint.X + 15, pendingHoverPoint.Y + 15, 5000);
+                    bool isFree = tile.path.EndsWith("|FREE|");
+                    string text = isFree ? $"{tile.name}\n{GraphicsHelpers.HumanReadable(tile.size)}" : $"{tile.name}\n{GraphicsHelpers.HumanReadable(tile.size)}\n{tile.path}";
+                    hoverTip.Show(text, drawPanel, pendingHoverPoint.X + 15, pendingHoverPoint.Y + 15, 5000);
                 }
             }
         }
