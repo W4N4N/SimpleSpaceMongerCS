@@ -110,7 +110,8 @@ namespace SimpleSpaceMongerCS
                         // draw tiles from cachedLayout using DrawTile (which will also populate tileHitTest)
                         foreach (var tl in cachedLayout)
                         {
-                            DrawTile(g, tl.Rect, (tl.Path, tl.Size, tl.Name), tl.Depth);
+                            // Use the centralized renderer for deterministic tile drawing
+                            SimpleSpaceMongerCS.Controls.TreemapRenderer.DrawTile(g, tl.Rect, tl.Path, tl.Size, tl.Name, tl.Depth, currentColorScheme, currentByPathPalette, total);
                         }
                     }
 

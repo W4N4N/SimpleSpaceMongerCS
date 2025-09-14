@@ -30,8 +30,6 @@ namespace SimpleSpaceMongerCS
         private Point lastMousePos;
         private readonly ProgressBar marqueeSpinner;
         private volatile bool isResizing = false;
-        private enum ColorScheme { ByPath, BySize, Monochrome, Pastel }
-        private enum ByPathPalette { Rainbow, Grayscale, Warm, Cool, Pastel }
         private ColorScheme currentColorScheme = ColorScheme.ByPath;
         private ByPathPalette currentByPathPalette = ByPathPalette.Rainbow;
         private readonly ToolStripMenuItem csByPathItem, csBySizeItem, csMonoItem, csPastelItem;
