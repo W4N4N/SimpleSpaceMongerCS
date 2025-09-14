@@ -114,8 +114,6 @@ Important runtime data structures
 
 ---
 
-## License
-No license file is included. Add a `LICENSE` if you intend to publish.
 
 ---
 
