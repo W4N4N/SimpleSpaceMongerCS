@@ -104,9 +104,17 @@ namespace SimpleSpaceMongerCS
                     // Also build nested child layouts adaptively so sub-tiles are rendered where visible
                     try
                     {
-                        // Adaptive parameters: global depth cap and minimum tile side dynamically based on panel size.
-                        const int globalDepthCap = 6; // hard safety cap to avoid pathological recursion
-                        int minTileSide = Math.Clamp(Math.Min(area.Width, area.Height) / 50, 12, 48); // dynamic, between 12 and 48 px
+                        // Adaptive parameters: use UI-configurable renderDepthCap and minTileAuto/minTileSideFixed.
+                        int globalDepthCap = Math.Max(1, Math.Min(12, renderDepthCap)); // clamp to sensible range
+                        int minTileSide;
+                        if (minTileAuto)
+                        {
+                            minTileSide = Math.Clamp(Math.Min(area.Width, area.Height) / 50, 12, 48); // dynamic, between 12 and 48 px
+                        }
+                        else
+                        {
+                            minTileSide = Math.Max(6, Math.Min(256, minTileSideFixed));
+                        }
 
                         var expanded = new List<TreemapLayout.TileLayout>(cachedLayout);
                         var queue = new Queue<TreemapLayout.TileLayout>(cachedLayout);
@@ -150,11 +158,9 @@ namespace SimpleSpaceMongerCS
                                 }
                             }
                         }
-
                         cachedLayout = expanded;
                     }
                     catch { }
-
                     // Create bitmap and render into it
                     cachedBitmap?.Dispose();
                     cachedBitmap = new Bitmap(Math.Max(1, area.Width), Math.Max(1, area.Height));
