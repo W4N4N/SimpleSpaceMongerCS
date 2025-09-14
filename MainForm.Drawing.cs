@@ -101,6 +101,34 @@ namespace SimpleSpaceMongerCS
                     // Build layout rectangles into cachedLayout via TreemapLayout
                     cachedLayout = TreemapLayout.BuildLayout(area, items);
 
+                    // Also build one-level nested layouts (children) inside each top-level tile so sub-tiles are rendered
+                    try
+                    {
+                        var expanded = new List<TreemapLayout.TileLayout>(cachedLayout);
+                        foreach (var tl in cachedLayout.ToList())
+                        {
+                            if (string.IsNullOrEmpty(tl.Path) || tl.Path.EndsWith("|FREE|") || tl.Path.StartsWith("DRIVE:")) continue;
+                            var children = sizes.Where(kv => kv.Key.StartsWith(tl.Path + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                                .Where(kv =>
+                                {
+                                    string rel = Path.GetRelativePath(tl.Path, kv.Key);
+                                    return !string.IsNullOrEmpty(rel) && rel != "." && !rel.Contains(Path.DirectorySeparatorChar.ToString());
+                                })
+                                .Select(kv => (path: kv.Key, size: kv.Value, name: Path.GetFileName(kv.Key))).OrderByDescending(c => c.size).ToList();
+                            if (children.Count == 0) continue;
+                            var innerRect = Rectangle.Round(tl.Rect);
+                            int pad = 6; // same padding used in DrawTreemap for nested draw
+                            innerRect.Inflate(-pad, -pad);
+                            if (innerRect.Width <= 0 || innerRect.Height <= 0) continue;
+
+                            var childLayouts = TreemapLayout.BuildLayout(innerRect, children, tl.Depth + 1);
+                            if (childLayouts != null && childLayouts.Count > 0)
+                                expanded.AddRange(childLayouts);
+                        }
+                        cachedLayout = expanded;
+                    }
+                    catch { }
+
                     // Create bitmap and render into it
                     cachedBitmap?.Dispose();
                     cachedBitmap = new Bitmap(Math.Max(1, area.Width), Math.Max(1, area.Height));
