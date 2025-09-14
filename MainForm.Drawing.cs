@@ -9,6 +9,9 @@ namespace SimpleSpaceMongerCS
 {
     public partial class MainForm
     {
+        // Hit-test entry for tiles (replaces tuple usage for clarity)
+        private readonly record struct TileHit(RectangleF Rect, string? Path, long Size, string Name);
+
         // Tile layout cache entry
         private class TileLayout
         {
@@ -262,7 +265,7 @@ namespace SimpleSpaceMongerCS
 
                     // Hit-test area (icon + label)
                     var hitRect = new RectangleF(x - padding / 2, y - padding / 2, iconSize + padding, iconSize + labelHeight + padding);
-                    tileHitTest.Add((hitRect, drives[i].path, drives[i].size, drives[i].name));
+                    tileHitTest.Add(new TileHit(hitRect, drives[i].path, drives[i].size, drives[i].name));
                 }
 
                 return;
@@ -281,7 +284,7 @@ namespace SimpleSpaceMongerCS
                 {
                     foreach (var tl in cachedLayout)
                     {
-                        tileHitTest.Add((tl.Rect, tl.Path, tl.Size, tl.Name));
+                        tileHitTest.Add(new TileHit(tl.Rect, tl.Path, tl.Size, tl.Name));
                     }
                 }
                 catch { }
@@ -351,11 +354,11 @@ namespace SimpleSpaceMongerCS
             {
                 if (!lastMousePos.IsEmpty && tileHitTest.Count > 0)
                 {
-                    var matches = tileHitTest.Where(t => t.rect.Contains(lastMousePos.X, lastMousePos.Y)).ToList();
+                    var matches = tileHitTest.Where(t => t.Rect.Contains(lastMousePos.X, lastMousePos.Y)).ToList();
                     if (matches.Count >= 2)
                     {
                         var parent = matches[matches.Count - 2];
-                        var parentRect = parent.rect;
+                        var parentRect = parent.Rect;
                         using (var brush = new SolidBrush(Color.FromArgb(40, 0, 120, 215)))
                         {
                             g2.FillRectangle(brush, parentRect);
@@ -455,7 +458,7 @@ namespace SimpleSpaceMongerCS
                 {
                     g.DrawRectangle(pen, Rectangle.Round(r));
                 }
-                tileHitTest.Add((r, it.path, it.size, it.name));
+                tileHitTest.Add(new TileHit(r, it.path, it.size, it.name));
                 return;
             }
 
@@ -592,7 +595,11 @@ namespace SimpleSpaceMongerCS
             catch { }
 
             // record this tile for hit-testing
-            tileHitTest.Add((r, it.path, it.size, it.name));
+            tileHitTest.Add(new TileHit(r, it.path, it.size, it.name));
         }
+
+        // Removed DrawSelectionOverlayImmediate: ephemeral CreateGraphics overlays caused flicker and
+        // inconsistent visuals with the cached bitmap approach. Selection is now drawn persistently
+        // during Paint via the cached bitmap path.
     }
 }

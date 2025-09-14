@@ -19,7 +19,7 @@ namespace SimpleSpaceMongerCS
         private Dictionary<string, long> sizes = new(StringComparer.OrdinalIgnoreCase);
         private string rootPath;
         private long total;
-        private readonly List<(RectangleF rect, string? path, long size, string name)> tileHitTest = [];
+        private readonly List<TileHit> tileHitTest = new List<TileHit>();
         private readonly ToolTip hoverTip = new();
         private readonly Image? diskIcon;
         private string? lastHoverPath = null;

@@ -13,10 +13,10 @@ namespace SimpleSpaceMongerCS
         {
             var p = e.Location;
             lastMousePos = p;
-            var found = tileHitTest.LastOrDefault(t => t.rect.Contains(p.X, p.Y));
-            if (found.path != null)
+            var found = tileHitTest.LastOrDefault(t => t.Rect.Contains(p.X, p.Y));
+            if (found.Path != null)
             {
-                pendingHoverPath = found.path;
+                pendingHoverPath = found.Path;
                 pendingHoverPoint = p;
                 hoverTimer.Stop();
                 hoverTimer.Start();
@@ -41,8 +41,8 @@ namespace SimpleSpaceMongerCS
         private void DrawPanel_MouseClick(object? sender, MouseEventArgs e)
         {
             var p = e.Location;
-            var tile = tileHitTest.LastOrDefault(t => t.rect.Contains(p.X, p.Y));
-            if (tile.path == null)
+            var tile = tileHitTest.LastOrDefault(t => t.Rect.Contains(p.X, p.Y));
+            if (tile.Path == null)
             {
                 // clicked outside any tile - clear selection
                 selectedPath = null;
@@ -50,13 +50,13 @@ namespace SimpleSpaceMongerCS
                 return;
             }
 
-            bool isDrive = tile.path.StartsWith("DRIVE:");
+            bool isDrive = tile.Path.StartsWith("DRIVE:");
             if (e.Button == MouseButtons.Left)
             {
                 // If this is a drive tile, start scanning it on left-click
                 if (isDrive)
                 {
-                    string actualPath = tile.path.Substring("DRIVE:".Length);
+                    string actualPath = tile.Path.Substring("DRIVE:".Length);
                     rootPath = actualPath;
                     selectedPath = null; // change of root clears selection
                     _ = ScanAndInvalidateAsync(rootPath);
@@ -64,27 +64,27 @@ namespace SimpleSpaceMongerCS
                 }
 
                 // Otherwise behave like hover (show tooltip/details briefly)
-                lastHoverPath = tile.path;
+                lastHoverPath = tile.Path;
                 // fast immediate feedback: draw overlay immediately and invalidate only affected region
                 string? oldSelected = selectedPath;
                 RectangleF oldRect = RectangleF.Empty;
                 if (!string.IsNullOrEmpty(oldSelected))
                 {
-                    var oldTile = tileHitTest.LastOrDefault(t => t.path == oldSelected);
-                    oldRect = oldTile.rect;
+                    var oldTile = tileHitTest.LastOrDefault(t => t.Path == oldSelected);
+                    oldRect = oldTile.Rect;
                 }
-                selectedPath = tile.path; // mark as selected
+                selectedPath = tile.Path; // mark as selected
                 // Invalidate only the union of old and new selection for permanent redraw (cached bitmap paints fast)
-                var union = oldRect.IsEmpty ? tile.rect : RectangleF.Union(oldRect, tile.rect);
+                var union = oldRect.IsEmpty ? tile.Rect : RectangleF.Union(oldRect, tile.Rect);
                 try { drawPanel.Invalidate(Rectangle.Round(union)); } catch { drawPanel.Invalidate(); }
-                bool isFree = tile.path.EndsWith("|FREE|");
+                bool isFree = tile.Path.EndsWith("|FREE|");
                 if (isFree)
                 {
-                    hoverTip.Show($"{tile.name}\n{GraphicsHelpers.HumanReadable(tile.size)}", drawPanel, p.X + 15, p.Y + 15, 5000);
+                    hoverTip.Show($"{tile.Name}\n{GraphicsHelpers.HumanReadable(tile.Size)}", drawPanel, p.X + 15, p.Y + 15, 5000);
                 }
                 else
                 {
-                    hoverTip.Show($"{tile.name}\n{GraphicsHelpers.HumanReadable(tile.size)}\n{tile.path}", drawPanel, p.X + 15, p.Y + 15, 5000);
+                    hoverTip.Show($"{tile.Name}\n{GraphicsHelpers.HumanReadable(tile.Size)}\n{tile.Path}", drawPanel, p.X + 15, p.Y + 15, 5000);
                 }
                 // Note: we intentionally do NOT draw a transient overlay using CreateGraphics here
                 // because the UI now relies on the cached bitmap paint path for immediate and
@@ -94,9 +94,9 @@ namespace SimpleSpaceMongerCS
             else if (e.Button == MouseButtons.Right)
             {
                 // Capture values locally so callbacks use the clicked tile values (avoid closure issues)
-                string clickedPath = tile.path;
-                long clickedSize = tile.size;
-                string clickedName = tile.name;
+                string clickedPath = tile.Path;
+                long clickedSize = tile.Size;
+                string clickedName = tile.Name;
                 bool isFree = clickedPath.EndsWith("|FREE|");
                 // reuse outer isDrive variable
 
@@ -202,12 +202,12 @@ namespace SimpleSpaceMongerCS
             hoverTimer.Stop();
             if (pendingHoverPath != null && pendingHoverPath != lastHoverPath)
             {
-                var tile = tileHitTest.LastOrDefault(t => t.path == pendingHoverPath);
-                if (tile.path != null)
+                var tile = tileHitTest.LastOrDefault(t => t.Path == pendingHoverPath);
+                if (tile.Path != null)
                 {
-                    lastHoverPath = tile.path;
-                    bool isFree = tile.path.EndsWith("|FREE|");
-                    string text = isFree ? $"{tile.name}\n{GraphicsHelpers.HumanReadable(tile.size)}" : $"{tile.name}\n{GraphicsHelpers.HumanReadable(tile.size)}\n{tile.path}";
+                    lastHoverPath = tile.Path;
+                    bool isFree = tile.Path.EndsWith("|FREE|");
+                    string text = isFree ? $"{tile.Name}\n{GraphicsHelpers.HumanReadable(tile.Size)}" : $"{tile.Name}\n{GraphicsHelpers.HumanReadable(tile.Size)}\n{tile.Path}";
                     hoverTip.Show(text, drawPanel, pendingHoverPoint.X + 15, pendingHoverPoint.Y + 15, 5000);
                 }
             }
