@@ -80,11 +80,15 @@ namespace SimpleSpaceMongerCS
                 bool isFree = tile.Path.EndsWith("|FREE|");
                 if (isFree)
                 {
-                    hoverTip.Show($"{tile.Name}\n{GraphicsHelpers.HumanReadable(tile.Size)}", drawPanel, p.X + 15, p.Y + 15, 5000);
+                    double pct = total > 0 ? (tile.Size * 100.0) / total : 0.0;
+                    string pctStr = pct >= 0 ? $" ({pct:0.##}% of total)" : string.Empty;
+                    hoverTip.Show($"{tile.Name}\n{GraphicsHelpers.HumanReadable(tile.Size)}{pctStr}", drawPanel, p.X + 15, p.Y + 15, 5000);
                 }
                 else
                 {
-                    hoverTip.Show($"{tile.Name}\n{GraphicsHelpers.HumanReadable(tile.Size)}\n{tile.Path}", drawPanel, p.X + 15, p.Y + 15, 5000);
+                    double pct = total > 0 ? (tile.Size * 100.0) / total : 0.0;
+                    string pctStr = pct >= 0 ? $" ({pct:0.##}% of total)" : string.Empty;
+                    hoverTip.Show($"{tile.Name}\n{GraphicsHelpers.HumanReadable(tile.Size)}{pctStr}\n{tile.Path}", drawPanel, p.X + 15, p.Y + 15, 5000);
                 }
                 // Note: we intentionally do NOT draw a transient overlay using CreateGraphics here
                 // because the UI now relies on the cached bitmap paint path for immediate and
@@ -213,7 +217,9 @@ namespace SimpleSpaceMongerCS
                 {
                     lastHoverPath = tile.Path;
                     bool isFree = tile.Path.EndsWith("|FREE|");
-                    string text = isFree ? $"{tile.Name}\n{GraphicsHelpers.HumanReadable(tile.Size)}" : $"{tile.Name}\n{GraphicsHelpers.HumanReadable(tile.Size)}\n{tile.Path}";
+                    double pct = total > 0 ? (tile.Size * 100.0) / total : 0.0;
+                    string pctStr = pct >= 0 ? $" ({pct:0.##}% of total)" : string.Empty;
+                    string text = isFree ? $"{tile.Name}\n{GraphicsHelpers.HumanReadable(tile.Size)}{pctStr}" : $"{tile.Name}\n{GraphicsHelpers.HumanReadable(tile.Size)}{pctStr}\n{tile.Path}";
                     hoverTip.Show(text, drawPanel, pendingHoverPoint.X + 15, pendingHoverPoint.Y + 15, 5000);
                 }
             }
