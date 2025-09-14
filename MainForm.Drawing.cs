@@ -9,89 +9,14 @@ namespace SimpleSpaceMongerCS
 {
     public partial class MainForm
     {
-        // Tile layout cache entry
-        private class TileLayout
-        {
-            public RectangleF Rect;
-            public string? Path;
-            public long Size;
-            public string Name = string.Empty;
-            public int Depth;
-        }
+        // Hit-test entry for tiles (replaces tuple usage for clarity)
+        private readonly record struct TileHit(RectangleF Rect, string? Path, long Size, string Name);
 
         // Cached layout and pre-rendered bitmap
-        private List<TileLayout> cachedLayout = new List<TileLayout>();
+        private List<TreemapLayout.TileLayout> cachedLayout = new List<TreemapLayout.TileLayout>();
         private Bitmap? cachedBitmap = null;
         private volatile bool layoutStale = true;
         private readonly object layoutLock = new object();
-
-        // Build layout (populate cachedLayout) using the same partitioning logic but without drawing
-        private void BuildLayoutTreemap(Rectangle area, List<(string path, long size, string name)> items, int depth)
-        {
-            if (items == null || items.Count == 0) return;
-            items = items.OrderByDescending(i => i.size).ToList();
-
-            if (items.Count == 1)
-            {
-                var it = items[0];
-                var rf = new RectangleF(area.X, area.Y, area.Width, area.Height);
-                cachedLayout.Add(new TileLayout { Rect = rf, Path = it.path, Size = it.size, Name = it.name, Depth = depth });
-
-                // children one-level deep
-                var children = sizes.Where(kv => kv.Key.StartsWith(it.path + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-                    .Where(kv =>
-                    {
-                        string rel = Path.GetRelativePath(it.path, kv.Key);
-                        return !string.IsNullOrEmpty(rel) && rel != "." && !rel.Contains(Path.DirectorySeparatorChar.ToString());
-                    })
-                    .Select(kv => (path: kv.Key, size: kv.Value, name: Path.GetFileName(kv.Key))).OrderByDescending(c => c.size).ToList();
-
-                if (children.Count > 0)
-                {
-                    Rectangle inner = Rectangle.Round(rf);
-                    int pad = 6;
-                    inner.Inflate(-pad, -pad);
-                    if (inner.Width > 0 && inner.Height > 0)
-                        BuildLayoutTreemap(inner, children, depth + 1);
-                }
-                return;
-            }
-
-            long totalSize = items.Sum(i => i.size);
-            // split items into two groups with roughly equal sum
-            long sum = 0; int splitIndex = 0;
-            for (int i = 0; i < items.Count; i++)
-            {
-                sum += items[i].size;
-                if (sum >= totalSize / 2)
-                {
-                    splitIndex = i;
-                    break;
-                }
-            }
-
-            var first = items.Take(splitIndex + 1).ToList();
-            var second = items.Skip(splitIndex + 1).ToList();
-
-            if (area.Width >= area.Height)
-            {
-                float ratio = totalSize > 0 ? (float)first.Sum(x => x.size) / totalSize : 0.5f;
-                int w1 = Math.Max(1, (int)Math.Round(area.Width * ratio));
-                var r1 = new Rectangle(area.X, area.Y, w1, area.Height);
-                var r2 = new Rectangle(area.X + w1, area.Y, area.Width - w1, area.Height);
-                BuildLayoutTreemap(r1, first, depth);
-                BuildLayoutTreemap(r2, second, depth);
-            }
-            else
-            {
-                float ratio = totalSize > 0 ? (float)first.Sum(x => x.size) / totalSize : 0.5f;
-                int h1 = Math.Max(1, (int)Math.Round(area.Height * ratio));
-                var r1 = new Rectangle(area.X, area.Y, area.Width, h1);
-                var r2 = new Rectangle(area.X, area.Y + h1, area.Width, area.Height - h1);
-                BuildLayoutTreemap(r1, first, depth);
-                BuildLayoutTreemap(r2, second, depth);
-            }
-        }
 
         // Rebuild cached layout and the pre-rendered bitmap. Call on scan completion or ResizeEnd.
         private void RebuildLayoutAndBitmap()
@@ -173,9 +98,69 @@ namespace SimpleSpaceMongerCS
                         items = items.OrderByDescending(i => i.size).ToList();
                     }
 
-                    // Build layout rectangles into cachedLayout
-                    BuildLayoutTreemap(area, items, 0);
+                    // Build layout rectangles into cachedLayout via TreemapLayout
+                    cachedLayout = TreemapLayout.BuildLayout(area, items);
 
+                    // Also build nested child layouts adaptively so sub-tiles are rendered where visible
+                    try
+                    {
+                        // Adaptive parameters: use UI-configurable renderDepthCap and minTileAuto/minTileSideFixed.
+                        int globalDepthCap = Math.Max(1, Math.Min(12, renderDepthCap)); // clamp to sensible range
+                        int minTileSide;
+                        if (minTileAuto)
+                        {
+                            minTileSide = Math.Clamp(Math.Min(area.Width, area.Height) / 50, 12, 48); // dynamic, between 12 and 48 px
+                        }
+                        else
+                        {
+                            minTileSide = Math.Max(6, Math.Min(256, minTileSideFixed));
+                        }
+
+                        var expanded = new List<TreemapLayout.TileLayout>(cachedLayout);
+                        var queue = new Queue<TreemapLayout.TileLayout>(cachedLayout);
+
+                        while (queue.Count > 0)
+                        {
+                            var parent = queue.Dequeue();
+                            if (parent == null) continue;
+                            if (parent.Depth >= globalDepthCap) continue;
+                            if (string.IsNullOrEmpty(parent.Path) || parent.Path.EndsWith("|FREE|") || parent.Path.StartsWith("DRIVE:")) continue;
+
+                            // discover immediate children (one-level) for this parent
+                            var children = sizes.Where(kv => kv.Key.StartsWith(parent.Path + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                                .Where(kv =>
+                                {
+                                    string rel = Path.GetRelativePath(parent.Path, kv.Key);
+                                    return !string.IsNullOrEmpty(rel) && rel != "." && !rel.Contains(Path.DirectorySeparatorChar.ToString());
+                                })
+                                .Select(kv => (path: kv.Key, size: kv.Value, name: Path.GetFileName(kv.Key))).OrderByDescending(c => c.size).ToList();
+
+                            if (children.Count == 0) continue;
+
+                            // compute inner rect with same padding as DrawTreemap so visuals match
+                            var innerRect = Rectangle.Round(parent.Rect);
+                            int pad = 6; // same padding used in DrawTreemap for nested draw
+                            innerRect.Inflate(-pad, -pad);
+
+                            // If parent's inner area is too small, skip subdividing it.
+                            if (innerRect.Width < minTileSide || innerRect.Height < minTileSide) continue;
+
+                            // Build child layouts inside parent's innerRect at depth parent.Depth + 1
+                            var childLayouts = TreemapLayout.BuildLayout(innerRect, children, parent.Depth + 1);
+                            if (childLayouts != null && childLayouts.Count > 0)
+                            {
+                                expanded.AddRange(childLayouts);
+                                // enqueue newly created child layouts for further subdivision if they are big enough and within cap
+                                foreach (var cl in childLayouts)
+                                {
+                                    if (cl.Depth < globalDepthCap && cl.Rect.Width >= minTileSide && cl.Rect.Height >= minTileSide)
+                                        queue.Enqueue(cl);
+                                }
+                            }
+                        }
+                        cachedLayout = expanded;
+                    }
+                    catch { }
                     // Create bitmap and render into it
                     cachedBitmap?.Dispose();
                     cachedBitmap = new Bitmap(Math.Max(1, area.Width), Math.Max(1, area.Height));
@@ -185,7 +170,8 @@ namespace SimpleSpaceMongerCS
                         // draw tiles from cachedLayout using DrawTile (which will also populate tileHitTest)
                         foreach (var tl in cachedLayout)
                         {
-                            DrawTile(g, tl.Rect, (tl.Path, tl.Size, tl.Name), tl.Depth);
+                            // Use the centralized renderer for deterministic tile drawing
+                            SimpleSpaceMongerCS.Controls.TreemapRenderer.DrawTile(g, tl.Rect, tl.Path, tl.Size, tl.Name, tl.Depth, currentColorScheme, currentByPathPalette, total);
                         }
                     }
 
@@ -262,7 +248,7 @@ namespace SimpleSpaceMongerCS
 
                     // Hit-test area (icon + label)
                     var hitRect = new RectangleF(x - padding / 2, y - padding / 2, iconSize + padding, iconSize + labelHeight + padding);
-                    tileHitTest.Add((hitRect, drives[i].path, drives[i].size, drives[i].name));
+                    tileHitTest.Add(new TileHit(hitRect, drives[i].path, drives[i].size, drives[i].name));
                 }
 
                 return;
@@ -281,7 +267,7 @@ namespace SimpleSpaceMongerCS
                 {
                     foreach (var tl in cachedLayout)
                     {
-                        tileHitTest.Add((tl.Rect, tl.Path, tl.Size, tl.Name));
+                        tileHitTest.Add(new TileHit(tl.Rect, tl.Path, tl.Size, tl.Name));
                     }
                 }
                 catch { }
@@ -351,11 +337,11 @@ namespace SimpleSpaceMongerCS
             {
                 if (!lastMousePos.IsEmpty && tileHitTest.Count > 0)
                 {
-                    var matches = tileHitTest.Where(t => t.rect.Contains(lastMousePos.X, lastMousePos.Y)).ToList();
+                    var matches = tileHitTest.Where(t => t.Rect.Contains(lastMousePos.X, lastMousePos.Y)).ToList();
                     if (matches.Count >= 2)
                     {
                         var parent = matches[matches.Count - 2];
-                        var parentRect = parent.rect;
+                        var parentRect = parent.Rect;
                         using (var brush = new SolidBrush(Color.FromArgb(40, 0, 120, 215)))
                         {
                             g2.FillRectangle(brush, parentRect);
@@ -455,7 +441,7 @@ namespace SimpleSpaceMongerCS
                 {
                     g.DrawRectangle(pen, Rectangle.Round(r));
                 }
-                tileHitTest.Add((r, it.path, it.size, it.name));
+                tileHitTest.Add(new TileHit(r, it.path, it.size, it.name));
                 return;
             }
 
@@ -592,7 +578,11 @@ namespace SimpleSpaceMongerCS
             catch { }
 
             // record this tile for hit-testing
-            tileHitTest.Add((r, it.path, it.size, it.name));
+            tileHitTest.Add(new TileHit(r, it.path, it.size, it.name));
         }
+
+        // Removed DrawSelectionOverlayImmediate: ephemeral CreateGraphics overlays caused flicker and
+        // inconsistent visuals with the cached bitmap approach. Selection is now drawn persistently
+        // during Paint via the cached bitmap path.
     }
 }
