@@ -12,89 +12,11 @@ namespace SimpleSpaceMongerCS
         // Hit-test entry for tiles (replaces tuple usage for clarity)
         private readonly record struct TileHit(RectangleF Rect, string? Path, long Size, string Name);
 
-        // Tile layout cache entry
-        private class TileLayout
-        {
-            public RectangleF Rect;
-            public string? Path;
-            public long Size;
-            public string Name = string.Empty;
-            public int Depth;
-        }
-
         // Cached layout and pre-rendered bitmap
-        private List<TileLayout> cachedLayout = new List<TileLayout>();
+        private List<TreemapLayout.TileLayout> cachedLayout = new List<TreemapLayout.TileLayout>();
         private Bitmap? cachedBitmap = null;
         private volatile bool layoutStale = true;
         private readonly object layoutLock = new object();
-
-        // Build layout (populate cachedLayout) using the same partitioning logic but without drawing
-        private void BuildLayoutTreemap(Rectangle area, List<(string path, long size, string name)> items, int depth)
-        {
-            if (items == null || items.Count == 0) return;
-            items = items.OrderByDescending(i => i.size).ToList();
-
-            if (items.Count == 1)
-            {
-                var it = items[0];
-                var rf = new RectangleF(area.X, area.Y, area.Width, area.Height);
-                cachedLayout.Add(new TileLayout { Rect = rf, Path = it.path, Size = it.size, Name = it.name, Depth = depth });
-
-                // children one-level deep
-                var children = sizes.Where(kv => kv.Key.StartsWith(it.path + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-                    .Where(kv =>
-                    {
-                        string rel = Path.GetRelativePath(it.path, kv.Key);
-                        return !string.IsNullOrEmpty(rel) && rel != "." && !rel.Contains(Path.DirectorySeparatorChar.ToString());
-                    })
-                    .Select(kv => (path: kv.Key, size: kv.Value, name: Path.GetFileName(kv.Key))).OrderByDescending(c => c.size).ToList();
-
-                if (children.Count > 0)
-                {
-                    Rectangle inner = Rectangle.Round(rf);
-                    int pad = 6;
-                    inner.Inflate(-pad, -pad);
-                    if (inner.Width > 0 && inner.Height > 0)
-                        BuildLayoutTreemap(inner, children, depth + 1);
-                }
-                return;
-            }
-
-            long totalSize = items.Sum(i => i.size);
-            // split items into two groups with roughly equal sum
-            long sum = 0; int splitIndex = 0;
-            for (int i = 0; i < items.Count; i++)
-            {
-                sum += items[i].size;
-                if (sum >= totalSize / 2)
-                {
-                    splitIndex = i;
-                    break;
-                }
-            }
-
-            var first = items.Take(splitIndex + 1).ToList();
-            var second = items.Skip(splitIndex + 1).ToList();
-
-            if (area.Width >= area.Height)
-            {
-                float ratio = totalSize > 0 ? (float)first.Sum(x => x.size) / totalSize : 0.5f;
-                int w1 = Math.Max(1, (int)Math.Round(area.Width * ratio));
-                var r1 = new Rectangle(area.X, area.Y, w1, area.Height);
-                var r2 = new Rectangle(area.X + w1, area.Y, area.Width - w1, area.Height);
-                BuildLayoutTreemap(r1, first, depth);
-                BuildLayoutTreemap(r2, second, depth);
-            }
-            else
-            {
-                float ratio = totalSize > 0 ? (float)first.Sum(x => x.size) / totalSize : 0.5f;
-                int h1 = Math.Max(1, (int)Math.Round(area.Height * ratio));
-                var r1 = new Rectangle(area.X, area.Y, area.Width, h1);
-                var r2 = new Rectangle(area.X, area.Y + h1, area.Width, area.Height - h1);
-                BuildLayoutTreemap(r1, first, depth);
-                BuildLayoutTreemap(r2, second, depth);
-            }
-        }
 
         // Rebuild cached layout and the pre-rendered bitmap. Call on scan completion or ResizeEnd.
         private void RebuildLayoutAndBitmap()
@@ -176,8 +98,8 @@ namespace SimpleSpaceMongerCS
                         items = items.OrderByDescending(i => i.size).ToList();
                     }
 
-                    // Build layout rectangles into cachedLayout
-                    BuildLayoutTreemap(area, items, 0);
+                    // Build layout rectangles into cachedLayout via TreemapLayout
+                    cachedLayout = TreemapLayout.BuildLayout(area, items);
 
                     // Create bitmap and render into it
                     cachedBitmap?.Dispose();
