@@ -101,30 +101,56 @@ namespace SimpleSpaceMongerCS
                     // Build layout rectangles into cachedLayout via TreemapLayout
                     cachedLayout = TreemapLayout.BuildLayout(area, items);
 
-                    // Also build one-level nested layouts (children) inside each top-level tile so sub-tiles are rendered
+                    // Also build nested child layouts adaptively so sub-tiles are rendered where visible
                     try
                     {
+                        // Adaptive parameters: global depth cap and minimum tile side dynamically based on panel size.
+                        const int globalDepthCap = 6; // hard safety cap to avoid pathological recursion
+                        int minTileSide = Math.Clamp(Math.Min(area.Width, area.Height) / 50, 12, 48); // dynamic, between 12 and 48 px
+
                         var expanded = new List<TreemapLayout.TileLayout>(cachedLayout);
-                        foreach (var tl in cachedLayout.ToList())
+                        var queue = new Queue<TreemapLayout.TileLayout>(cachedLayout);
+
+                        while (queue.Count > 0)
                         {
-                            if (string.IsNullOrEmpty(tl.Path) || tl.Path.EndsWith("|FREE|") || tl.Path.StartsWith("DRIVE:")) continue;
-                            var children = sizes.Where(kv => kv.Key.StartsWith(tl.Path + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                            var parent = queue.Dequeue();
+                            if (parent == null) continue;
+                            if (parent.Depth >= globalDepthCap) continue;
+                            if (string.IsNullOrEmpty(parent.Path) || parent.Path.EndsWith("|FREE|") || parent.Path.StartsWith("DRIVE:")) continue;
+
+                            // discover immediate children (one-level) for this parent
+                            var children = sizes.Where(kv => kv.Key.StartsWith(parent.Path + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                                 .Where(kv =>
                                 {
-                                    string rel = Path.GetRelativePath(tl.Path, kv.Key);
+                                    string rel = Path.GetRelativePath(parent.Path, kv.Key);
                                     return !string.IsNullOrEmpty(rel) && rel != "." && !rel.Contains(Path.DirectorySeparatorChar.ToString());
                                 })
                                 .Select(kv => (path: kv.Key, size: kv.Value, name: Path.GetFileName(kv.Key))).OrderByDescending(c => c.size).ToList();
+
                             if (children.Count == 0) continue;
-                            var innerRect = Rectangle.Round(tl.Rect);
+
+                            // compute inner rect with same padding as DrawTreemap so visuals match
+                            var innerRect = Rectangle.Round(parent.Rect);
                             int pad = 6; // same padding used in DrawTreemap for nested draw
                             innerRect.Inflate(-pad, -pad);
-                            if (innerRect.Width <= 0 || innerRect.Height <= 0) continue;
 
-                            var childLayouts = TreemapLayout.BuildLayout(innerRect, children, tl.Depth + 1);
+                            // If parent's inner area is too small, skip subdividing it.
+                            if (innerRect.Width < minTileSide || innerRect.Height < minTileSide) continue;
+
+                            // Build child layouts inside parent's innerRect at depth parent.Depth + 1
+                            var childLayouts = TreemapLayout.BuildLayout(innerRect, children, parent.Depth + 1);
                             if (childLayouts != null && childLayouts.Count > 0)
+                            {
                                 expanded.AddRange(childLayouts);
+                                // enqueue newly created child layouts for further subdivision if they are big enough and within cap
+                                foreach (var cl in childLayouts)
+                                {
+                                    if (cl.Depth < globalDepthCap && cl.Rect.Width >= minTileSide && cl.Rect.Height >= minTileSide)
+                                        queue.Enqueue(cl);
+                                }
+                            }
                         }
+
                         cachedLayout = expanded;
                     }
                     catch { }
