@@ -1,7 +1,5 @@
 using System;
 using System.Drawing;
-using System.IO;
-using System.Linq;
 
 namespace SimpleSpaceMongerCS.Controls
 {
@@ -75,16 +73,6 @@ namespace SimpleSpaceMongerCS.Controls
                 var rr = Rectangle.Round(r);
                 g.DrawRectangle(pen, rr);
             }
-
-            bool hasChildren = false;
-            try
-            {
-                if (!string.IsNullOrEmpty(path) && !path.StartsWith("DRIVE:") && !path.EndsWith("|FREE|"))
-                {
-                    // hasChildren cannot be reliably known by renderer; caller can pass metadata if desired
-                }
-            }
-            catch { }
 
             if (isDrive)
             {
