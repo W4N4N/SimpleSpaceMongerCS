@@ -11,31 +11,31 @@ namespace SimpleSpaceMongerCS
 {
     public partial class MainForm : Form
     {
-        private MenuStrip menuStrip;
-        private Panel drawPanel;
-        private FolderBrowserDialog folderDialog;
-        private ProgressBar progressBar;
-        private Label lblStatus;
-        private Dictionary<string, long> sizes = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        private readonly MenuStrip menuStrip;
+        private readonly Panel drawPanel;
+        private readonly FolderBrowserDialog folderDialog;
+        private readonly ProgressBar progressBar;
+        private readonly Label lblStatus;
+        private Dictionary<string, long> sizes = new(StringComparer.OrdinalIgnoreCase);
         private string rootPath;
         private long total;
-        private List<(RectangleF rect, string? path, long size, string name)> tileHitTest = new List<(RectangleF, string?, long, string)>();
-        private ToolTip hoverTip = new ToolTip();
-        private Image? diskIcon;
+        private readonly List<(RectangleF rect, string? path, long size, string name)> tileHitTest = [];
+        private readonly ToolTip hoverTip = new();
+        private readonly Image? diskIcon;
         private string? lastHoverPath = null;
         private string? selectedPath = null;
-        private System.Windows.Forms.Timer hoverTimer;
+        private readonly System.Windows.Forms.Timer hoverTimer;
         private string? pendingHoverPath = null;
         private Point pendingHoverPoint;
         private Point lastMousePos;
-        private ProgressBar marqueeSpinner;
+        private readonly ProgressBar marqueeSpinner;
         private volatile bool isResizing = false;
         private enum ColorScheme { ByPath, BySize, Monochrome, Pastel }
         private enum ByPathPalette { Rainbow, Grayscale, Warm, Cool, Pastel }
         private ColorScheme currentColorScheme = ColorScheme.ByPath;
         private ByPathPalette currentByPathPalette = ByPathPalette.Rainbow;
-        private ToolStripMenuItem csByPathItem, csBySizeItem, csMonoItem, csPastelItem;
-        private ToolStripMenuItem bpRainbowItem, bpGrayItem, bpWarmItem, bpCoolItem, bpPastelItem;
+        private readonly ToolStripMenuItem csByPathItem, csBySizeItem, csMonoItem, csPastelItem;
+        private readonly ToolStripMenuItem bpRainbowItem, bpGrayItem, bpWarmItem, bpCoolItem, bpPastelItem;
 
         public MainForm()
         {
@@ -43,10 +43,6 @@ namespace SimpleSpaceMongerCS
             Width = 1000;
             Height = 700;
 
-            //btnBrowse = new Button { Text = "Browse...", Dock = DockStyle.Top, Height = 30 };
-            //btnBrowse.Click += BtnBrowse_Click;
-
-            //progressBar = new ProgressBar { Dock = DockStyle.Top, Height = 20, Minimum = 0, Maximum = 100, Value = 0 };
             progressBar = new ProgressBar { Dock = DockStyle.Top, Height = 20, Minimum = 0, Maximum = 100, Value = 0 };
             lblStatus = new Label { Text = "Ready", Dock = DockStyle.Top, Height = 18, TextAlign = ContentAlignment.MiddleLeft };
 
@@ -56,8 +52,10 @@ namespace SimpleSpaceMongerCS
             drawPanel.MouseMove += DrawPanel_MouseMove;
             drawPanel.MouseLeave += DrawPanel_MouseLeave;
             drawPanel.MouseClick += DrawPanel_MouseClick;
-            hoverTimer = new System.Windows.Forms.Timer();
-            hoverTimer.Interval = 150; // ms debounce
+            hoverTimer = new System.Windows.Forms.Timer
+            {
+                Interval = 150 // ms debounce
+            };
             hoverTimer.Tick += HoverTimer_Tick;
 
             Controls.Add(drawPanel);
@@ -152,6 +150,7 @@ namespace SimpleSpaceMongerCS
                 drawPanel.Invalidate();
             else
                 _ = ScanAndInvalidateAsync(rootPath);
+
         }
 
         private async Task ScanAndInvalidateAsync(string path)
