@@ -42,7 +42,7 @@ namespace SimpleSpaceMongerCS
         {
             var p = e.Location;
             var tile = tileHitTest.LastOrDefault(t => t.rect.Contains(p.X, p.Y));
-            if (tile.path == null) 
+            if (tile.path == null)
             {
                 // clicked outside any tile - clear selection
                 selectedPath = null;
@@ -86,6 +86,10 @@ namespace SimpleSpaceMongerCS
                 {
                     hoverTip.Show($"{tile.name}\n{GraphicsHelpers.HumanReadable(tile.size)}\n{tile.path}", drawPanel, p.X + 15, p.Y + 15, 5000);
                 }
+                // Note: we intentionally do NOT draw a transient overlay using CreateGraphics here
+                // because the UI now relies on the cached bitmap paint path for immediate and
+                // consistent feedback. Drawing directly with CreateGraphics can be overwritten by
+                // subsequent paints and causes visible flicker.
             }
             else if (e.Button == MouseButtons.Right)
             {

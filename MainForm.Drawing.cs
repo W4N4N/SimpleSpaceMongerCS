@@ -203,88 +203,88 @@ namespace SimpleSpaceMongerCS
                 e.Graphics.Clear(Color.White);
                 return;
             }
-             // If we're in drives overview mode, show each logical drive as a grid of icons (like Explorer)
-             if (rootPath == "__DRIVES__")
-             {
-                 var g = e.Graphics;
-                 g.Clear(Color.White);
-                 tileHitTest.Clear();
+            // If we're in drives overview mode, show each logical drive as a grid of icons (like Explorer)
+            if (rootPath == "__DRIVES__")
+            {
+                var g = e.Graphics;
+                g.Clear(Color.White);
+                tileHitTest.Clear();
 
-                 var drives = DriveInfo.GetDrives().Where(d => d.IsReady)
-                     .OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
-                     .Select(d =>
-                 {
-                     long size = d.TotalSize > 0 ? d.TotalSize : 1;
-                     string letter = d.Name.TrimEnd('\\'); // e.g. "C:"
-                     string label = string.IsNullOrEmpty(d.VolumeLabel) ? letter : $"{letter}: {d.VolumeLabel}";
-                     return (drive: d, path: "DRIVE:" + d.Name, size: size, name: label);
-                 }).ToList();
+                var drives = DriveInfo.GetDrives().Where(d => d.IsReady)
+                    .OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
+                    .Select(d =>
+                {
+                    long size = d.TotalSize > 0 ? d.TotalSize : 1;
+                    string letter = d.Name.TrimEnd('\\'); // e.g. "C:"
+                    string label = string.IsNullOrEmpty(d.VolumeLabel) ? letter : $"{letter}: {d.VolumeLabel}";
+                    return (drive: d, path: "DRIVE:" + d.Name, size: size, name: label);
+                }).ToList();
 
-                 if (drives.Count == 0)
-                 {
-                     g.DrawString("No drives found", Font, Brushes.Black, 10, 10);
-                     return;
-                 }
+                if (drives.Count == 0)
+                {
+                    g.DrawString("No drives found", Font, Brushes.Black, 10, 10);
+                    return;
+                }
 
-                 int padding = 12;
-                 int iconSize = 64;
-                 int labelHeight = 20;
-                 int cellWidth = iconSize + padding * 2;
-                 int clientWidth = drawPanel.ClientSize.Width;
-                 int cols = Math.Max(1, clientWidth / cellWidth);
-                 int x0 = padding;
-                 int y0 = padding;
+                int padding = 12;
+                int iconSize = 64;
+                int labelHeight = 20;
+                int cellWidth = iconSize + padding * 2;
+                int clientWidth = drawPanel.ClientSize.Width;
+                int cols = Math.Max(1, clientWidth / cellWidth);
+                int x0 = padding;
+                int y0 = padding;
 
-                 for (int i = 0; i < drives.Count; i++)
-                 {
-                     int col = i % cols;
-                     int row = i / cols;
-                     int x = x0 + col * cellWidth;
-                     int y = y0 + row * (iconSize + labelHeight + padding);
+                for (int i = 0; i < drives.Count; i++)
+                {
+                    int col = i % cols;
+                    int row = i / cols;
+                    int x = x0 + col * cellWidth;
+                    int y = y0 + row * (iconSize + labelHeight + padding);
 
-                     var iconRect = new RectangleF(x, y, iconSize, iconSize);
+                    var iconRect = new RectangleF(x, y, iconSize, iconSize);
 
-                     // Draw icon
-                     if (diskIcon != null)
-                     {
-                         g.DrawImage(diskIcon, Rectangle.Round(iconRect));
-                     }
-                     else
-                     {
-                         try { g.DrawIcon(SystemIcons.Application, Rectangle.Round(iconRect)); } catch { }
-                     }
+                    // Draw icon
+                    if (diskIcon != null)
+                    {
+                        g.DrawImage(diskIcon, Rectangle.Round(iconRect));
+                    }
+                    else
+                    {
+                        try { g.DrawIcon(SystemIcons.Application, Rectangle.Round(iconRect)); } catch { }
+                    }
 
-                     // Draw label centered under icon
-                     var label = drives[i].name;
-                     var labelRect = new RectangleF(x, y + iconSize, iconSize, labelHeight);
-                     var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Near };
-                     g.DrawString(label, this.Font, Brushes.Black, labelRect, sf);
+                    // Draw label centered under icon
+                    var label = drives[i].name;
+                    var labelRect = new RectangleF(x, y + iconSize, iconSize, labelHeight);
+                    var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Near };
+                    g.DrawString(label, this.Font, Brushes.Black, labelRect, sf);
 
-                     // Hit-test area (icon + label)
-                     var hitRect = new RectangleF(x - padding/2, y - padding/2, iconSize + padding, iconSize + labelHeight + padding);
-                     tileHitTest.Add((hitRect, drives[i].path, drives[i].size, drives[i].name));
-                 }
+                    // Hit-test area (icon + label)
+                    var hitRect = new RectangleF(x - padding / 2, y - padding / 2, iconSize + padding, iconSize + labelHeight + padding);
+                    tileHitTest.Add((hitRect, drives[i].path, drives[i].size, drives[i].name));
+                }
 
-                 return;
-             }
+                return;
+            }
 
-             var g2 = e.Graphics;
-             g2.Clear(Color.White);
-             tileHitTest.Clear();
-             // If we have a valid cached bitmap matching the panel size, draw it for fast paint
-             if (cachedBitmap != null && cachedBitmap.Width == drawPanel.ClientSize.Width && cachedBitmap.Height == drawPanel.ClientSize.Height && !layoutStale)
-             {
-                 g2.DrawImageUnscaled(cachedBitmap, 0, 0);
-                 // repopulate hit-test entries from the cached layout so clicks/hovers work
-                 tileHitTest.Clear();
-                 try
-                 {
-                     foreach (var tl in cachedLayout)
-                     {
-                         tileHitTest.Add((tl.Rect, tl.Path, tl.Size, tl.Name));
-                     }
-                 }
-                 catch { }
+            var g2 = e.Graphics;
+            g2.Clear(Color.White);
+            tileHitTest.Clear();
+            // If we have a valid cached bitmap matching the panel size, draw it for fast paint
+            if (cachedBitmap != null && cachedBitmap.Width == drawPanel.ClientSize.Width && cachedBitmap.Height == drawPanel.ClientSize.Height && !layoutStale)
+            {
+                g2.DrawImageUnscaled(cachedBitmap, 0, 0);
+                // repopulate hit-test entries from the cached layout so clicks/hovers work
+                tileHitTest.Clear();
+                try
+                {
+                    foreach (var tl in cachedLayout)
+                    {
+                        tileHitTest.Add((tl.Rect, tl.Path, tl.Size, tl.Name));
+                    }
+                }
+                catch { }
                 // Draw persistent selection overlay if a tile is selected
                 try
                 {
@@ -306,71 +306,71 @@ namespace SimpleSpaceMongerCS
                     }
                 }
                 catch { }
-                 // tileHitTest was populated during bitmap render
-                 // Draw selection/overlays on top
-                 // (the code below will handle parent highlight and other overlays)
-             }
-             else
-             {
-                 // No cached bitmap — fall back to full draw to preserve behavior
-                 if (sizes == null || sizes.Count == 0)
-                 {
-                     g2.DrawString(lblStatus.Text, Font, Brushes.Black, 10, 10);
-                     return;
-                 }
+                // tileHitTest was populated during bitmap render
+                // Draw selection/overlays on top
+                // (the code below will handle parent highlight and other overlays)
+            }
+            else
+            {
+                // No cached bitmap — fall back to full draw to preserve behavior
+                if (sizes == null || sizes.Count == 0)
+                {
+                    g2.DrawString(lblStatus.Text, Font, Brushes.Black, 10, 10);
+                    return;
+                }
 
-                 Rectangle rect = drawPanel.ClientRectangle;
-                 if (rect.Width <= 0 || rect.Height <= 0) return;
+                Rectangle rect = drawPanel.ClientRectangle;
+                if (rect.Width <= 0 || rect.Height <= 0) return;
 
-                 // Rebuild layout synchronously if missing so first display is correct
-                 RebuildLayoutAndBitmap();
-                 if (cachedBitmap != null)
-                 {
-                     g2.DrawImageUnscaled(cachedBitmap, 0, 0);
-                 }
-                 else
-                 {
-                     // If still no bitmap, fallback to original DrawTreemap path
-                     Rectangle rect2 = drawPanel.ClientRectangle;
-                     var rootChildren = new List<(string path, long size, string name)>();
-                     foreach (var kv in sizes)
-                     {
-                         if (kv.Key.Equals(rootPath, StringComparison.OrdinalIgnoreCase)) continue;
-                         string rel = Path.GetRelativePath(rootPath, kv.Key);
-                         if (string.IsNullOrEmpty(rel) || rel == ".") continue;
-                         if (!rel.Contains(Path.DirectorySeparatorChar.ToString()))
-                             rootChildren.Add((kv.Key, kv.Value, Path.GetFileName(kv.Key)));
-                     }
-                     var items = rootChildren.OrderByDescending(i => i.size).ToList();
-                     DrawTreemap(g2, rect2, items, 0);
-                 }
-             }
+                // Rebuild layout synchronously if missing so first display is correct
+                RebuildLayoutAndBitmap();
+                if (cachedBitmap != null)
+                {
+                    g2.DrawImageUnscaled(cachedBitmap, 0, 0);
+                }
+                else
+                {
+                    // If still no bitmap, fallback to original DrawTreemap path
+                    Rectangle rect2 = drawPanel.ClientRectangle;
+                    var rootChildren = new List<(string path, long size, string name)>();
+                    foreach (var kv in sizes)
+                    {
+                        if (kv.Key.Equals(rootPath, StringComparison.OrdinalIgnoreCase)) continue;
+                        string rel = Path.GetRelativePath(rootPath, kv.Key);
+                        if (string.IsNullOrEmpty(rel) || rel == ".") continue;
+                        if (!rel.Contains(Path.DirectorySeparatorChar.ToString()))
+                            rootChildren.Add((kv.Key, kv.Value, Path.GetFileName(kv.Key)));
+                    }
+                    var items = rootChildren.OrderByDescending(i => i.size).ToList();
+                    DrawTreemap(g2, rect2, items, 0);
+                }
+            }
 
-             // Draw a subtle highlight around the parent tile (second-innermost) under the mouse to aid clicking
-             try
-             {
-                 if (!lastMousePos.IsEmpty && tileHitTest.Count > 0)
-                 {
-                     var matches = tileHitTest.Where(t => t.rect.Contains(lastMousePos.X, lastMousePos.Y)).ToList();
-                     if (matches.Count >= 2)
-                     {
-                         var parent = matches[matches.Count - 2];
-                         var parentRect = parent.rect;
-                         using (var brush = new SolidBrush(Color.FromArgb(40, 0, 120, 215)))
-                         {
-                             g2.FillRectangle(brush, parentRect);
-                         }
-                         using (var pen = new Pen(Color.FromArgb(200, 0, 120, 215), 3))
-                         {
-                             g2.DrawRectangle(pen, Rectangle.Round(parentRect));
-                         }
-                      }
-                  }
-              }
-             catch { }
+            // Draw a subtle highlight around the parent tile (second-innermost) under the mouse to aid clicking
+            try
+            {
+                if (!lastMousePos.IsEmpty && tileHitTest.Count > 0)
+                {
+                    var matches = tileHitTest.Where(t => t.rect.Contains(lastMousePos.X, lastMousePos.Y)).ToList();
+                    if (matches.Count >= 2)
+                    {
+                        var parent = matches[matches.Count - 2];
+                        var parentRect = parent.rect;
+                        using (var brush = new SolidBrush(Color.FromArgb(40, 0, 120, 215)))
+                        {
+                            g2.FillRectangle(brush, parentRect);
+                        }
+                        using (var pen = new Pen(Color.FromArgb(200, 0, 120, 215), 3))
+                        {
+                            g2.DrawRectangle(pen, Rectangle.Round(parentRect));
+                        }
+                    }
+                }
+            }
+            catch { }
 
-             return;
-         }
+            return;
+        }
 
         // Improved treemap using recursive binary partitioning for better aspect ratios
         private void DrawTreemap(Graphics g, Rectangle area, List<(string path, long size, string name)> items, int depth)
@@ -505,13 +505,13 @@ namespace SimpleSpaceMongerCS
                     }
                     break;
             }
-             using (var brush = new SolidBrush(col)) g.FillRectangle(brush, r);
-             int penWidth = Math.Min(4, 1 + depth / 2); // modest thickening for deeper tiles
-             using (var pen = new Pen(Color.FromArgb(110, 100, 100, 100), penWidth))
-             {
-                 var rr = Rectangle.Round(r);
-                 g.DrawRectangle(pen, rr);
-             }
+            using (var brush = new SolidBrush(col)) g.FillRectangle(brush, r);
+            int penWidth = Math.Min(4, 1 + depth / 2); // modest thickening for deeper tiles
+            using (var pen = new Pen(Color.FromArgb(110, 100, 100, 100), penWidth))
+            {
+                var rr = Rectangle.Round(r);
+                g.DrawRectangle(pen, rr);
+            }
 
             // If this tile has child folders, draw a stronger outer border to make parent boundaries obvious
             bool hasChildren = false;
@@ -593,29 +593,6 @@ namespace SimpleSpaceMongerCS
 
             // record this tile for hit-testing
             tileHitTest.Add((r, it.path, it.size, it.name));
-        }
-
-        private void DrawSelectionOverlayImmediate(RectangleF r)
-        {
-            try
-            {
-                if (r.Width <= 0 || r.Height <= 0) return;
-                using (var g = drawPanel.CreateGraphics())
-                {
-                    // Use same highlight style as permanent draw: translucent fill + orange border
-                    using (var selBrush = new SolidBrush(Color.FromArgb(56, 255, 215, 64)))
-                    {
-                        g.FillRectangle(selBrush, r);
-                    }
-                    int selPenWidth = 4;
-                    using (var selPen = new Pen(Color.FromArgb(220, 255, 140, 0), selPenWidth))
-                    {
-                        var selRect = Rectangle.Round(new RectangleF(r.X + 1, r.Y + 1, Math.Max(0, r.Width - 2), Math.Max(0, r.Height - 2)));
-                        g.DrawRectangle(selPen, selRect);
-                    }
-                }
-            }
-            catch { }
         }
     }
 }
