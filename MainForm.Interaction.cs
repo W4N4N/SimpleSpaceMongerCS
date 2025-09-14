@@ -122,7 +122,9 @@ namespace SimpleSpaceMongerCS
 
                     cms.Items.Add("Details", null, (s, a) =>
                     {
-                        MessageBox.Show($"{clickedName}\n{GraphicsHelpers.HumanReadable(clickedSize)}\n{actualPath}", "Details", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        double pct = total > 0 ? (clickedSize * 100.0) / total : 0.0;
+                        string pctStr = pct >= 0 ? $" ({pct:0.##}% of total)" : string.Empty;
+                        MessageBox.Show($"{clickedName}\n{GraphicsHelpers.HumanReadable(clickedSize)}{pctStr}\n{actualPath}", "Details", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     });
 
                     cms.Items.Add("Scan this disk", null, (s, a) =>
@@ -146,7 +148,9 @@ namespace SimpleSpaceMongerCS
 
                     cms.Items.Add("Details", null, (s, a) =>
                     {
-                        MessageBox.Show($"{clickedName}\n{GraphicsHelpers.HumanReadable(clickedSize)}\n{clickedPath}", "Details", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        double pct = total > 0 ? (clickedSize * 100.0) / total : 0.0;
+                        string pctStr = pct >= 0 ? $" ({pct:0.##}% of total)" : string.Empty;
+                        MessageBox.Show($"{clickedName}\n{GraphicsHelpers.HumanReadable(clickedSize)}{pctStr}\n{clickedPath}", "Details", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     });
 
                     cms.Items.Add("Zoom In", null, (s, a) =>
@@ -171,7 +175,9 @@ namespace SimpleSpaceMongerCS
                     // For free-space tile only show Details
                     cms.Items.Add("Details", null, (s, a) =>
                     {
-                        MessageBox.Show($"{clickedName}\n{GraphicsHelpers.HumanReadable(clickedSize)}", "Details", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        double pct = total > 0 ? (clickedSize * 100.0) / total : 0.0;
+                        string pctStr = pct >= 0 ? $" ({pct:0.##}% of total)" : string.Empty;
+                        MessageBox.Show($"{clickedName}\n{GraphicsHelpers.HumanReadable(clickedSize)}{pctStr}", "Details", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     });
                 }
 
