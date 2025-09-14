@@ -81,13 +81,13 @@ namespace SimpleSpaceMongerCS
                 if (isFree)
                 {
                     double pct = total > 0 ? (tile.Size * 100.0) / total : 0.0;
-                    string pctStr = pct >= 0 ? $" ({pct:0.##}% of total)" : string.Empty;
+                    string pctStr = pct >= 0 ? $" ({pct:0.##}%)" : string.Empty;
                     hoverTip.Show($"{tile.Name}\n{GraphicsHelpers.HumanReadable(tile.Size)}{pctStr}", drawPanel, p.X + 15, p.Y + 15, 5000);
                 }
                 else
                 {
                     double pct = total > 0 ? (tile.Size * 100.0) / total : 0.0;
-                    string pctStr = pct >= 0 ? $" ({pct:0.##}% of total)" : string.Empty;
+                    string pctStr = pct >= 0 ? $" ({pct:0.##}%)" : string.Empty;
                     hoverTip.Show($"{tile.Name}\n{GraphicsHelpers.HumanReadable(tile.Size)}{pctStr}\n{tile.Path}", drawPanel, p.X + 15, p.Y + 15, 5000);
                 }
                 // Note: we intentionally do NOT draw a transient overlay using CreateGraphics here
@@ -127,7 +127,7 @@ namespace SimpleSpaceMongerCS
                     cms.Items.Add("Details", null, (s, a) =>
                     {
                         double pct = total > 0 ? (clickedSize * 100.0) / total : 0.0;
-                        string pctStr = pct >= 0 ? $" ({pct:0.##}% of total)" : string.Empty;
+                        string pctStr = pct >= 0 ? $" ({pct:0.##}%)" : string.Empty;
                         MessageBox.Show($"{clickedName}\n{GraphicsHelpers.HumanReadable(clickedSize)}{pctStr}\n{actualPath}", "Details", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     });
 
@@ -153,7 +153,7 @@ namespace SimpleSpaceMongerCS
                     cms.Items.Add("Details", null, (s, a) =>
                     {
                         double pct = total > 0 ? (clickedSize * 100.0) / total : 0.0;
-                        string pctStr = pct >= 0 ? $" ({pct:0.##}% of total)" : string.Empty;
+                        string pctStr = pct >= 0 ? $" ({pct:0.##}%)" : string.Empty;
                         MessageBox.Show($"{clickedName}\n{GraphicsHelpers.HumanReadable(clickedSize)}{pctStr}\n{clickedPath}", "Details", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     });
 
@@ -180,7 +180,7 @@ namespace SimpleSpaceMongerCS
                     cms.Items.Add("Details", null, (s, a) =>
                     {
                         double pct = total > 0 ? (clickedSize * 100.0) / total : 0.0;
-                        string pctStr = pct >= 0 ? $" ({pct:0.##}% of total)" : string.Empty;
+                        string pctStr = pct >= 0 ? $" ({pct:0.##}%)" : string.Empty;
                         MessageBox.Show($"{clickedName}\n{GraphicsHelpers.HumanReadable(clickedSize)}{pctStr}", "Details", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     });
                 }
@@ -218,7 +218,7 @@ namespace SimpleSpaceMongerCS
                     lastHoverPath = tile.Path;
                     bool isFree = tile.Path.EndsWith("|FREE|");
                     double pct = total > 0 ? (tile.Size * 100.0) / total : 0.0;
-                    string pctStr = pct >= 0 ? $" ({pct:0.##}% of total)" : string.Empty;
+                    string pctStr = pct >= 0 ? $" ({pct:0.##}%)" : string.Empty;
                     string text = isFree ? $"{tile.Name}\n{GraphicsHelpers.HumanReadable(tile.Size)}{pctStr}" : $"{tile.Name}\n{GraphicsHelpers.HumanReadable(tile.Size)}{pctStr}\n{tile.Path}";
                     hoverTip.Show(text, drawPanel, pendingHoverPoint.X + 15, pendingHoverPoint.Y + 15, 5000);
                 }

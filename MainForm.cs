@@ -35,6 +35,11 @@ namespace SimpleSpaceMongerCS
         private readonly ToolStripMenuItem csByPathItem, csBySizeItem, csMonoItem, csPastelItem;
         private readonly ToolStripMenuItem bpRainbowItem, bpGrayItem, bpWarmItem, bpCoolItem, bpPastelItem;
 
+        // Rendering settings (configurable from UI)
+        private int renderDepthCap = 6; // safety cap, editable via View->Rendering
+        private bool minTileAuto = true; // whether min tile side is computed automatically
+        private int minTileSideFixed = 24; // when minTileAuto==false, use this fixed value
+
         public MainForm()
         {
             Text = "Simple SpaceMonger";
@@ -122,6 +127,53 @@ namespace SimpleSpaceMongerCS
             colorMenu.DropDownItems.Add(bpMenu);
             viewMenu.DropDownItems.Add(new ToolStripSeparator());
             viewMenu.DropDownItems.Add(colorMenu);
+
+            // Rendering settings submenu (expose adaptive depth and min tile size)
+            var renderingMenu = new ToolStripMenuItem("Rendering");
+
+            // Max Render Depth submenu
+            var depthMenu = new ToolStripMenuItem("Max Render Depth");
+            for (int d = 1; d <= 6; d++)
+            {
+                int depth = d; // capture
+                var item = new ToolStripMenuItem(depth.ToString(), null, (s, a) =>
+                {
+                    renderDepthCap = depth;
+                    // rebuild layout with new cap
+                    layoutStale = true;
+                    _ = System.Threading.Tasks.Task.Run(() => { RebuildLayoutAndBitmap(); this.BeginInvoke((Action)(() => drawPanel.Invalidate())); });
+                });
+                depthMenu.DropDownItems.Add(item);
+            }
+            renderingMenu.DropDownItems.Add(depthMenu);
+
+            // Min Tile Size submenu
+            var minTileMenu = new ToolStripMenuItem("Min Tile Size");
+            var autoItem = new ToolStripMenuItem("Auto", null, (s, a) =>
+            {
+                minTileAuto = true;
+                layoutStale = true;
+                _ = System.Threading.Tasks.Task.Run(() => { RebuildLayoutAndBitmap(); this.BeginInvoke((Action)(() => drawPanel.Invalidate())); });
+            }) { Checked = minTileAuto };
+            minTileMenu.DropDownItems.Add(autoItem);
+            int[] sizes = new[] { 12, 16, 20, 24, 32, 48 };
+            foreach (var sz in sizes)
+            {
+                int fixedSz = sz;
+                var it = new ToolStripMenuItem(sz.ToString() + " px", null, (s, a) =>
+                {
+                    minTileAuto = false;
+                    minTileSideFixed = fixedSz;
+                    layoutStale = true;
+                    _ = System.Threading.Tasks.Task.Run(() => { RebuildLayoutAndBitmap(); this.BeginInvoke((Action)(() => drawPanel.Invalidate())); });
+                });
+                minTileMenu.DropDownItems.Add(it);
+            }
+            renderingMenu.DropDownItems.Add(new ToolStripSeparator());
+            renderingMenu.DropDownItems.Add(minTileMenu);
+
+            viewMenu.DropDownItems.Add(new ToolStripSeparator());
+            viewMenu.DropDownItems.Add(renderingMenu);
 
             var helpMenu = new ToolStripMenuItem("Help");
             helpMenu.DropDownItems.Add(new ToolStripMenuItem("About", null, (s, a) => AboutMenu_Click(s, a)));

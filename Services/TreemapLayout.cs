@@ -19,7 +19,8 @@ namespace SimpleSpaceMongerCS
         }
 
         // Build layout (populate list) using recursive binary partitioning
-        public static List<TileLayout> BuildLayout(Rectangle area, List<(string path, long size, string name)> items)
+        // startDepth lets callers place children with a deeper depth offset.
+        public static List<TileLayout> BuildLayout(Rectangle area, List<(string path, long size, string name)> items, int startDepth = 0)
         {
             var result = new List<TileLayout>();
             if (items == null || items.Count == 0) return result;
@@ -35,8 +36,7 @@ namespace SimpleSpaceMongerCS
                     var rf = new RectangleF(a.X, a.Y, a.Width, a.Height);
                     result.Add(new TileLayout { Rect = rf, Path = it.path, Size = it.size, Name = it.name, Depth = depth });
 
-                    // children one-level deep
-                    // Note: children discovery should be done by caller if needed; here we just keep same behavior for single tile
+                    // children one-level deep are handled by the caller by calling BuildLayout again with startDepth = depth+1
                     return;
                 }
 
@@ -75,7 +75,7 @@ namespace SimpleSpaceMongerCS
                 }
             }
 
-            Recurse(area, items, 0);
+            Recurse(area, items, startDepth);
             return result;
         }
     }
