@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,9 +8,42 @@ namespace SimpleSpaceMongerCS
 {
     public static class FileScanner
     {
+        // Simple in-memory cache keyed by normalized root path. Values are aggregated size maps.
+        private static ConcurrentDictionary<string, Dictionary<string, long>> _cache = new ConcurrentDictionary<string, Dictionary<string, long>>(StringComparer.OrdinalIgnoreCase);
+
+        private static string NormalizePath(string path)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(path)) return path ?? string.Empty;
+                var full = Path.GetFullPath(path);
+                return full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            }
+            catch { return path ?? string.Empty; }
+        }
+
+        public static void ClearCache(string? root = null)
+        {
+            if (string.IsNullOrEmpty(root))
+            {
+                _cache.Clear();
+                return;
+            }
+            var key = NormalizePath(root);
+            _cache.TryRemove(key, out _);
+        }
+
         // Moved from MainForm.ScanPath; identical behavior
         public static Dictionary<string, long> ScanPath(string root, IProgress<int>? progress)
         {
+            var key = NormalizePath(root);
+            // Return cached copy if present
+            if (_cache.TryGetValue(key, out var cached))
+            {
+                // Return a shallow copy so caller won't mutate the cached dictionary
+                return new Dictionary<string, long>(cached, StringComparer.OrdinalIgnoreCase);
+            }
+
             var allDirs = new List<string>();
             var stack = new Stack<string>();
             stack.Push(root);
@@ -63,7 +97,16 @@ namespace SimpleSpaceMongerCS
             // Ensure root exists
             if (!aggregated.ContainsKey(root)) aggregated[root] = fileSizes.ContainsKey(root) ? fileSizes[root] : 0;
 
-            return aggregated;
+            // Cache the result (store a copy)
+            try
+            {
+                var toCache = new Dictionary<string, long>(aggregated, StringComparer.OrdinalIgnoreCase);
+                _cache[key] = toCache;
+            }
+            catch { }
+
+            // Return a copy to caller
+            return new Dictionary<string, long>(aggregated, StringComparer.OrdinalIgnoreCase);
         }
     }
 }
